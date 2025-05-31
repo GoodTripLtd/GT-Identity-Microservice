@@ -10,13 +10,11 @@
     <PackageReference Include="Amazon.AspNetCore.Identity.Cognito" Version="4.0.0" />
     <PackageReference Include="Amazon.Extensions.CognitoAuthentication" Version="3.0.0" />
     <PackageReference Include="AWSSDK.CognitoIdentityProvider" Version="4.0.1.2" />
-    <PackageReference Include="MediatR" Version="12.5.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.5" />
     <PackageReference Include="Riok.Mapperly" Version="4.2.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Identity.Microservice.Common\Identity.Microservice.Common.csproj" />
+    <ProjectReference Include="..\Identity.Microservice.Domain\Identity.Microservice.Domain.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace Identity.Microservice.API.Models.Exceptions
+namespace Identity.Microservice.AppCore.Exceptions
 {
     public class HttpException : Exception
     {

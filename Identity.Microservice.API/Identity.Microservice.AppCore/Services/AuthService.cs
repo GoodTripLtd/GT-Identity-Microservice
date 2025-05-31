@@ -1,15 +1,14 @@
 ﻿using Amazon.CognitoIdentityProvider;
 using Amazon.CognitoIdentityProvider.Model;
 using Amazon.Extensions.CognitoAuthentication;
-using AutoMapper;
+using Azure.Core;
+using Identity.Microservice.API.Mappers;
+using Identity.Microservice.AppCore.Exceptions;
+using Identity.Microservice.AppCore.Options;
+using Identity.Microservice.Common.Interfaces.Repositories;
+using Identity.Microservice.Common.Interfaces.Services;
+using Identity.Microservice.Common.ResponseModels.Auth;
 using Microsoft.Extensions.Options;
-using MLTEST.Interfaces.Repositories;
-using MLTEST.Interfaces.Services;
-using MLTEST.Models.Entities;
-using MLTEST.Models.Exceptions;
-using MLTEST.Models.Options;
-using MLTEST.Models.Request;
-using MLTEST.Models.Response;
 using System.Net;
 
 namespace Identity.Microservice.AppCore.Services.AuthService
@@ -18,57 +17,83 @@ namespace Identity.Microservice.AppCore.Services.AuthService
     {
         private readonly IAmazonCognitoIdentityProvider _identityProvider;
         private readonly CognitoUserPool _userPool;
-        private readonly IUserRepository _userRepository;
         private readonly AmazonCognitoOptions _cognitoConfig;
-        private readonly IMapper _mapper;
 
-        public AuthService(IAmazonCognitoIdentityProvider identityProvider, CognitoUserPool userPool, IUserRepository userRepository
-            , IOptions<AmazonCognitoOptions> options, IMapper mapper)
+        public AuthService(IAmazonCognitoIdentityProvider identityProvider,
+            CognitoUserPool userPool,
+            IOptions<AmazonCognitoOptions> options)
         {
             _identityProvider = identityProvider;
             _userPool = userPool;
-            _userRepository = userRepository;
             _cognitoConfig = options.Value;
-            _mapper = mapper;
         }
 
-        public async Task<LoginUserView> LoginAsync(LoginUserRequest data)
+        public async Task<bool> ConfirmSignUpAsync(string username, string confirmationCode)
         {
-            var user = new CognitoUser(data.Email, _cognitoConfig.ClientId, _userPool, _identityProvider);
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("Username не може бути порожнім", nameof(username));
+
+            if (string.IsNullOrWhiteSpace(confirmationCode))
+                throw new ArgumentException("Confirmation code не може бути порожнім", nameof(confirmationCode));
+
+            var confirmRequest = new ConfirmSignUpRequest
+            {
+                ClientId = _cognitoConfig.ClientId,
+                Username = username,
+                ConfirmationCode = confirmationCode
+            };
+
+            var response = await _identityProvider.ConfirmSignUpAsync(confirmRequest);
+
+            if (response.HttpStatusCode != HttpStatusCode.OK)
+            {
+                throw new Exception($"Неочікуваний статус від Cognito: {response.HttpStatusCode}");
+            }
+
+            return response.HttpStatusCode == HttpStatusCode.OK;
+        }
+        public async Task<LoginResponseDto> LoginAsync(string email, string password)
+        {
+            var user = new CognitoUser(email, _cognitoConfig.ClientId, _userPool, _identityProvider);
             var authRequest = new InitiateSrpAuthRequest
             {
-                Password = data.Password
+                Password = password
             };
 
             var authResponse = await user.StartWithSrpAuthAsync(authRequest);
 
-            var expiresAt = DateTime.Now + TimeSpan.FromSeconds(authResponse.AuthenticationResult.ExpiresIn);
+            var expiresAt = DateTime.Now + TimeSpan.FromSeconds(Convert.ToDouble(authResponse.AuthenticationResult.ExpiresIn));
 
-            var response = new LoginUserView
+            var response = new LoginResponseDto
             {
                 IdToken = authResponse.AuthenticationResult.IdToken,
                 RefreshToken = authResponse.AuthenticationResult.RefreshToken,
+                AccessToken = authResponse.AuthenticationResult.AccessToken,
                 ExpiresAt = expiresAt
             };
 
             return response;
         }
 
-        public async Task<string> RegisterAsync(RegisterUserRequest data)
+        public async Task<string?> RegisterAsync(string firstName,
+            string lastName,
+            string email,
+            string username,
+            string password)
         {
             bool isAdded = false;
 
             var request = new SignUpRequest
             {
                 ClientId = _cognitoConfig.ClientId,
-                Password = data.Password,
-                Username = data.Username,
+                Password = password,
+                Username = email,
                 UserAttributes = new List<AttributeType>
                 {
                     new()
                     {
                         Name = "email",
-                        Value = data.Email
+                        Value = email
                     },
                     new()
                     {
@@ -78,7 +103,7 @@ namespace Identity.Microservice.AppCore.Services.AuthService
                     new()
                     {
                         Name = "name",
-                        Value = data.Username
+                        Value = username
                     }
                 },
             };
@@ -87,41 +112,36 @@ namespace Identity.Microservice.AppCore.Services.AuthService
 
             if (signUpResponse.HttpStatusCode == HttpStatusCode.OK)
             {
-                var user = _mapper.Map<UserEntity>(data);
-                var role = await _userRepository.GetRoleByTitleAsync("user");
-
-                if (role is null) 
-                {
-                    var deleteRequest = new AdminDeleteUserRequest
-                    {
-                        Username = data.Username,
-                        UserPoolId = _cognitoConfig.UserPoolId
-                    };
-
-                    await _identityProvider.AdminDeleteUserAsync(deleteRequest);
-                    throw new HttpException("Role hasn't been found", HttpStatusCode.NotFound);
-                }
-
-                user.Role = role;
-
-                try
-                {
-                    await _userRepository.AddUserAsync(user);
-                    isAdded = true;
-                }
-                catch
-                {
-                    var deleteRequest = new AdminDeleteUserRequest
-                    {
-                        Username = data.Username,
-                        UserPoolId = _cognitoConfig.UserPoolId
-                    };
-
-                    await _identityProvider.AdminDeleteUserAsync(deleteRequest);
-                }
+                return signUpResponse.UserSub;
             }
+            return null;
+        }
 
-            return isAdded ? $"User {data.Username} has been successfully registered. You need to verify you email now." : "User hasn't been registered.";
+        public async Task ChangePasswordAsync(string accessToken, string previousPassword, string proposedPassword)
+        {
+            if (string.IsNullOrWhiteSpace(accessToken))
+                throw new ArgumentException("AccessToken не може бути порожнім.", nameof(accessToken));
+
+            if (string.IsNullOrWhiteSpace(previousPassword))
+                throw new ArgumentException("Попередній пароль не може бути порожнім.", nameof(previousPassword));
+
+            if (string.IsNullOrWhiteSpace(proposedPassword))
+                throw new ArgumentException("Новий пароль не може бути порожнім.", nameof(proposedPassword));
+
+            var request = new ChangePasswordRequest
+            {
+                AccessToken = accessToken,
+                PreviousPassword = previousPassword,
+                ProposedPassword = proposedPassword
+            };
+
+            var response = await _identityProvider.ChangePasswordAsync(request);
+
+            // Якщо статус не OK – це нетипова ситуація, зазвичай помилок тут не буває.
+            if (response.HttpStatusCode != System.Net.HttpStatusCode.OK)
+            {
+                throw new Exception($"Неочікуваний статус при зміні паролю: {response.HttpStatusCode}");
+            }
         }
     }
 }

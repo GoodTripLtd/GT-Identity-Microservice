@@ -1,4 +1,7 @@
-﻿namespace Identity.Microservice.API.Middlewares
+﻿using Identity.Microservice.API.Models.Response;
+using Identity.Microservice.AppCore.Exceptions;
+
+namespace Identity.Microservice.API.Middlewares
 {
     public class ExceptionHandlerMiddlware
     {
