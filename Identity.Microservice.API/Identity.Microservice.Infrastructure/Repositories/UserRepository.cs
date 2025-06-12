@@ -5,22 +5,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Identity.Microservice.Infrastructure.Repositories
 {
-    public class UserRepository : IUserRepository
+    public class UserRepository : GenericRepository<User>, IUserRepository
     {
         private readonly ApplicationDbContext _dbContext;
 
-        public UserRepository(ApplicationDbContext dbContext)
-        {
-            _dbContext = dbContext;
-        }
+        public UserRepository(ApplicationDbContext dbContext):base(dbContext) { }
 
         public async Task<IEnumerable<User>> GetAllAsync()
         {
-            // Якщо треба: .AsNoTracking() для «легкого» завантаження, коли ми не плануємо змінювати об’єкти
             return await _dbContext.Users.AsNoTracking().ToListAsync();
         }
 
@@ -45,7 +42,6 @@ namespace Identity.Microservice.Infrastructure.Repositories
                 ModifiedAt = DateTime.UtcNow
             };
 
-            // Тут Id і CreatedAt уже мають бути заповнені, але можна перевірити/ініціювати за потреби
             await _dbContext.Users.AddAsync(user);
             return await _dbContext.SaveChangesAsync();
         }
@@ -76,6 +72,16 @@ namespace Identity.Microservice.Infrastructure.Repositories
 
             _dbContext.Users.Remove(existing);
             await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task<bool> BanToggle(Guid id)
+        {
+            var rowsAffected = await _dbContext.Users
+                .Where(u => u.Id == id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.IsBlocked, u => !u.IsBlocked));
+
+            return rowsAffected > 0;
         }
     }
 }

@@ -8,6 +8,7 @@ using Identity.Microservice.API.Models.Request;
 using Identity.Microservice.AppCore.Commands.LoginUser;
 using Identity.Microservice.AppCore.Commands.ChangePassword;
 using Microsoft.AspNetCore.Authorization;
+using Identity.Microservice.AppCore.Commands;
 
 namespace Identity.Microservice.API.Controllers
 {
@@ -68,12 +69,25 @@ namespace Identity.Microservice.API.Controllers
             return Ok();
         }
 
-        [HttpPut]
-        [Authorize(Roles = "user")]
+        [HttpPost("SendForgotPasswordCode")]
+        [Authorize("user")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ErrorDetails), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UpdateUser()
+        public async Task<IActionResult> SendForgotPasswordCode(string username)
         {
+            await _mediator.Send(new SendForgotPasswordCommand(username));
+
+            return Ok();
+        }
+
+        [HttpPost("ConfirmForgotPassword")]
+        [Authorize("user")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ErrorDetails), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ConfirmForgotPassword(string username, string confirmationCode, string newPassword)
+        {
+            await _mediator.Send(new ConfirmForgotPasswordCommand(username, confirmationCode, newPassword));
+
             return Ok();
         }
     }

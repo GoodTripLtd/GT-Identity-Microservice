@@ -19,5 +19,8 @@ namespace Identity.Microservice.Common.Interfaces.Services
 
         public Task<bool> ConfirmSignUpAsync(string username, string code);
         public Task ChangePasswordAsync(string accessToken, string previousPassword, string proposedPassword);
+
+        public Task ForgotPasswordAsync(string username);
+        public Task ConfirmForgotPasswordAsync(string username, string confirmationCode, string newPassword);
     }
 }

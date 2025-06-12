@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 
 namespace Identity.Microservice.Common.Interfaces.Repositories
 {
-    public interface IUserRepository : IGenericRepository<User>
+    public interface IUserTagRepository : IGenericRepository<UserTag>
     {
-        Task<bool> BanToggle(Guid id);
     }
 }

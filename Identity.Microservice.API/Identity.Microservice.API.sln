@@ -19,7 +19,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Identity.Microservice.Infra
 		{015B651E-D62D-4146-8FA4-DEE8CCE42133} = {015B651E-D62D-4146-8FA4-DEE8CCE42133}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Identity.Microservice.Common", "Identity.Microservice.Common\Identity.Microservice.Common.csproj", "{D96455F3-FBEE-4A61-A2B7-9D111F8D0349}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Identity.Microservice.Common", "Identity.Microservice.Common\Identity.Microservice.Common.csproj", "{D96455F3-FBEE-4A61-A2B7-9D111F8D0349}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

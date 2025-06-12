@@ -62,7 +62,8 @@ namespace Identity.Microservice.AppCore.Services.AuthService
 
             var authResponse = await user.StartWithSrpAuthAsync(authRequest);
 
-            var expiresAt = DateTime.Now + TimeSpan.FromSeconds(Convert.ToDouble(authResponse.AuthenticationResult.ExpiresIn));
+            var expiresAt = DateTime.Now + TimeSpan.FromSeconds(Convert.ToDouble(
+                authResponse.AuthenticationResult.ExpiresIn));
 
             var response = new LoginResponseDto
             {
@@ -134,13 +135,88 @@ namespace Identity.Microservice.AppCore.Services.AuthService
                 PreviousPassword = previousPassword,
                 ProposedPassword = proposedPassword
             };
-
+            new ConfirmForgotPasswordRequest { };
             var response = await _identityProvider.ChangePasswordAsync(request);
 
-            // Якщо статус не OK – це нетипова ситуація, зазвичай помилок тут не буває.
             if (response.HttpStatusCode != System.Net.HttpStatusCode.OK)
             {
                 throw new Exception($"Неочікуваний статус при зміні паролю: {response.HttpStatusCode}");
+            }
+        }
+        public async Task ForgotPasswordAsync(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("Username не може бути порожнім.", nameof(username));
+
+            var request = new ForgotPasswordRequest
+            {
+                ClientId = _cognitoConfig.ClientId,
+                Username = username
+            };
+
+            try
+            {
+                var response = await _identityProvider.ForgotPasswordAsync(request);
+
+            }
+            catch (UserNotFoundException)
+            {
+                throw new InvalidOperationException("Користувача з таким ім’ям не знайдено.");
+            }
+            catch (LimitExceededException)
+            {
+                throw new InvalidOperationException("Перевищено ліміт запитів на відновлення паролю. Спробуйте пізніше.");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Помилка при ініціалізації відновлення паролю: {ex.Message}", ex);
+            }
+        }
+        public async Task ConfirmForgotPasswordAsync(string username, string confirmationCode, string newPassword)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("Username не може бути порожнім.", nameof(username));
+            if (string.IsNullOrWhiteSpace(confirmationCode))
+                throw new ArgumentException("ConfirmationCode не може бути порожнім.", nameof(confirmationCode));
+            if (string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentException("Новий пароль не може бути порожнім.", nameof(newPassword));
+
+            var request = new ConfirmForgotPasswordRequest
+            {
+                ClientId = _cognitoConfig.ClientId,
+                Username = username,
+                ConfirmationCode = confirmationCode,
+                Password = newPassword
+            };
+
+            try
+            {
+                var response = await _identityProvider.ConfirmForgotPasswordAsync(request);
+
+                if (response.HttpStatusCode != System.Net.HttpStatusCode.OK)
+                {
+                    throw new Exception($"Неочікуваний статус: {response.HttpStatusCode}");
+                }
+            }
+            catch (UserNotFoundException)
+            {
+                throw new InvalidOperationException("Користувача з таким ім’ям не знайдено.");
+            }
+            catch (CodeMismatchException)
+            {
+                throw new InvalidOperationException("Невірний код підтвердження.");
+            }
+            catch (ExpiredCodeException)
+            {
+                throw new InvalidOperationException("Код підтвердження прострочений. Спробуйте запросити новий.");
+            }
+            catch (InvalidPasswordException ex)
+            {
+                throw new InvalidOperationException($"Новий пароль не відповідає вимогам: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Помилка при підтвердженні відновлення паролю: {ex.Message}", ex);
             }
         }
     }

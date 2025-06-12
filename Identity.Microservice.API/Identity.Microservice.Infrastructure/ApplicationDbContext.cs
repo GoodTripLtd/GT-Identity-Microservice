@@ -24,7 +24,7 @@ namespace Identity.Microservice.Infrastructure
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer();
+            optionsBuilder.UseNpgsql();
         }
     }
 }
